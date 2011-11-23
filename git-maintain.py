@@ -20,7 +20,12 @@ for git_dir_path in args.git_dir_path:
     s.wait()
     output = s.stdout.read()
     object_count = int(output.split()[0])
-    print('{}: {} loose objects'.format(osps(git_dir_path)[0], object_count))
+    dir_name_pieces = osps(git_dir_path)
+    if dir_name_pieces[1] == '.git':
+        display_name = dir_name_pieces[0]
+    else:
+        display_name = git_dir_path
+    print('{}: {} loose objects'.format(display_name, object_count))
     if object_count and not args.pretend:
         Popen((x.format(git_dir_path) for x in repack)).wait()
         Popen((x.format(git_dir_path) for x in prune)).wait()
