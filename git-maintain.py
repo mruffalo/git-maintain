@@ -1,9 +1,10 @@
 #!/usr/bin/env python
+from __future__ import print_function
 import argparse
 from os.path import split as osps
 from subprocess import Popen, PIPE
 
-git_command = ('git', '--git-dir={}')
+git_command = ('git', '--git-dir={0}')
 count_objects = git_command + ('count-objects',)
 repack = git_command + ('repack', '-Ad')
 prune = git_command + ('prune', '-v')
@@ -25,7 +26,7 @@ for git_dir_path in args.git_dir_path:
         display_name = dir_name_pieces[0]
     else:
         display_name = git_dir_path
-    print('{}: {} loose objects'.format(display_name, object_count))
+    print('{0}: {1} loose objects'.format(display_name, object_count))
     if object_count and not args.pretend:
         Popen((x.format(git_dir_path) for x in repack)).wait()
         Popen((x.format(git_dir_path) for x in prune)).wait()
