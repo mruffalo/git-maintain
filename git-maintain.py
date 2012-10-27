@@ -4,6 +4,7 @@ from argparse import ArgumentParser
 from fnmatch import fnmatch
 from os import listdir, walk
 from os.path import abspath, split as osps, join as ospj, isdir
+from shutil import rmtree
 from subprocess import Popen, PIPE
 
 git_command = ('git', '--git-dir={0}')
@@ -11,6 +12,8 @@ count_objects = git_command + ('count-objects',)
 repack = git_command + ('repack', '-Ad')
 prune = git_command + ('prune', '-v')
 pack_refs = git_command + ('pack-refs',)
+# TODO don't hardcode 'origin'
+remote_prune = git_command + ('remote', 'prune', 'origin')
 pack_pattern = '*.pack'
 git_dir_pattern = '.git'
 
@@ -44,13 +47,28 @@ def should_repack(git_dir_path):
                                                        object_count, pack_count))
     return object_count or (pack_count - 1)
 
+def remove_logs(git_dir_path):
+    git_log_dir = ospj(git_dir_path, 'logs')
+    if isdir(git_log_dir):
+        rmtree(git_log_dir)
+
 if __name__  == '__main__':
     p = ArgumentParser()
     p.add_argument('directory')
+    p.add_argument('--remote-prune', action='store_true')
+    p.add_argument('--remove-logs', action='store_true')
     p.add_argument('-n', '--pretend', action='store_true')
     args = p.parse_args()
     for git_directory in find_git_dirs(args.directory):
-        if should_repack(git_directory) and not args.pretend:
+        if args.remote_prune:
+            Popen((x.format(git_directory) for x in remote_prune)).wait()
+        if args.remove_logs:
+            remove_logs(git_directory)
+        force_repack = False
+        if args.remote_prune or args.remove_logs:
+            force_repack = True
+            print('{0}: repack forced'.format(git_directory))
+        if (force_repack or should_repack(git_directory)) and not args.pretend:
             Popen((x.format(git_directory) for x in repack)).wait()
             Popen((x.format(git_directory) for x in prune)).wait()
 
