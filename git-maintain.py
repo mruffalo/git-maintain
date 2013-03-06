@@ -20,7 +20,7 @@ git_dir_pattern = '.git'
 def find_git_dirs(path):
     for dirpath, dirnames, _ in walk(path):
         for dirname in dirnames:
-            if git_dir_pattern in dirname:
+            if dirname.endswith(git_dir_pattern):
                 yield ospj(dirpath, dirname)
 
 def get_pack_count(path):
