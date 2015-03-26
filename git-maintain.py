@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 from __future__ import print_function
 from argparse import ArgumentParser
 from fnmatch import fnmatch
@@ -11,7 +11,7 @@ git_command = ('git', '--git-dir={0}')
 count_objects = git_command + ('count-objects',)
 repack = git_command + ('repack', '-Ad')
 prune = git_command + ('prune', '-v')
-pack_refs = git_command + ('pack-refs',)
+pack_refs = git_command + ('pack-refs', '--all')
 # TODO don't hardcode 'origin'
 remote_prune = git_command + ('remote', 'prune', 'origin')
 pack_pattern = '*.pack'
