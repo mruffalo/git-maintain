@@ -1,13 +1,18 @@
 #!/usr/bin/env python3
-from __future__ import print_function
 from argparse import ArgumentParser
 from fnmatch import fnmatch
-from os import listdir, walk
+from os import listdir
 from os.path import abspath, split as osps, join as ospj, isdir
+from pathlib import Path
 from shutil import rmtree
 from subprocess import Popen, PIPE
 
-git_command = ('git', '--git-dir={0}')
+try:
+    from scandir import walk
+except ImportError:
+    from os import walk
+
+git_command = ('git', '--git-dir={}')
 count_objects = git_command + ('count-objects',)
 repack = git_command + ('repack', '-Ad')
 prune = git_command + ('prune', '-v')
@@ -17,44 +22,60 @@ remote_prune = git_command + ('remote', 'prune', 'origin')
 pack_pattern = '*.pack'
 git_dir_pattern = '.git'
 
-def find_git_dirs(path):
-    for dirpath, dirnames, _ in walk(path):
+def find_git_dirs(path: Path):
+    for dirpath_str, dirnames, _ in walk(str(path)):
+        dirpath = Path(dirpath_str)
         for dirname in dirnames:
             if dirname.endswith(git_dir_pattern):
-                yield ospj(dirpath, dirname)
+                yield dirpath / dirname
 
-def get_pack_count(path):
-    pack_dir = ospj(path, 'objects', 'pack')
-    if isdir(pack_dir):
-        packs = [p for p in listdir(pack_dir) if fnmatch(p, pack_pattern)]
+def get_pack_count(path: Path):
+    pack_dir = path / 'objects' / 'pack'
+    if pack_dir.is_dir():
+        packs = [p for p in pack_dir.iterdir() if p.match(pack_pattern)]
         return len(packs)
     else:
         return 0
 
-def should_repack(git_dir_path):
-    Popen((x.format(git_dir_path) for x in pack_refs)).wait()
-    s = Popen((x.format(git_dir_path) for x in count_objects), stdout=PIPE)
+def should_repack(git_dir_path: Path):
+    command = [
+        piece.format(git_dir_path)
+        for piece in pack_refs
+    ]
+    Popen(command).wait()
+
+    command = [
+        piece.format(git_dir_path)
+        for piece in count_objects
+    ]
+    s = Popen(command, stdout=PIPE)
     s.wait()
     output = s.stdout.read()
     object_count = int(output.split()[0])
-    dir_name_pieces = osps(git_dir_path)
-    if dir_name_pieces[1] == '.git':
-        display_name = dir_name_pieces[0]
+
+    if git_dir_path.name == '.git':
+        display_name = git_dir_path.parent / git_dir_path.stem
     else:
         display_name = git_dir_path
+
     pack_count = get_pack_count(git_dir_path)
-    print('{0}: {1} loose objects, {2} pack(s)'.format(display_name,
-                                                       object_count, pack_count))
+    print(
+        '{}: {} loose objects, {} pack(s)'.format(
+            display_name,
+            object_count,
+            pack_count,
+        )
+    )
     return object_count or (pack_count - 1)
 
-def remove_logs(git_dir_path):
-    git_log_dir = ospj(git_dir_path, 'logs')
-    if isdir(git_log_dir):
-        rmtree(git_log_dir)
+def remove_logs(git_dir_path: Path):
+    git_log_dir = git_dir_path / 'logs'
+    if git_log_dir.is_dir():
+        rmtree(str(git_log_dir))
 
 if __name__  == '__main__':
     p = ArgumentParser()
-    p.add_argument('directory')
+    p.add_argument('directory', type=Path)
     p.add_argument('--remote-prune', action='store_true')
     p.add_argument('--remove-logs', action='store_true')
     p.add_argument('-n', '--pretend', action='store_true')
