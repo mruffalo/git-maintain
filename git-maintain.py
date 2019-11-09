@@ -5,12 +5,16 @@ from os import listdir
 from os.path import abspath, split as osps, join as ospj, isdir
 from pathlib import Path
 from shutil import rmtree
-from subprocess import Popen, PIPE
+from subprocess import Popen, PIPE, check_call
+from typing import Iterable
 
 try:
     from scandir import walk
 except ImportError:
     from os import walk
+
+REPOSITORY_COLOR = '\033[01;34m'
+NO_COLOR = '\033[00m'
 
 git_command = ('git', '--git-dir={}')
 count_objects = git_command + ('count-objects',)
@@ -22,22 +26,22 @@ remote_prune = git_command + ('remote', 'prune', 'origin')
 pack_pattern = '*.pack'
 git_dir_pattern = '.git'
 
-def find_git_dirs(path: Path):
-    for dirpath_str, dirnames, _ in walk(str(path)):
+def find_git_dirs(path: Path) -> Iterable[Path]:
+    for dirpath_str, dirnames, _ in walk(path):
         dirpath = Path(dirpath_str)
         for dirname in dirnames:
             if dirname.endswith(git_dir_pattern):
                 yield dirpath / dirname
 
-def get_pack_count(path: Path):
+def get_pack_count(path: Path) -> int:
     pack_dir = path / 'objects' / 'pack'
     if pack_dir.is_dir():
-        packs = [p for p in pack_dir.iterdir() if p.match(pack_pattern)]
+        packs = list(pack_dir.glob('pack_pattern'))
         return len(packs)
     else:
         return 0
 
-def should_repack(git_dir_path: Path):
+def should_repack(git_dir_path: Path) -> bool:
     command = [
         piece.format(git_dir_path)
         for piece in pack_refs
@@ -60,18 +64,20 @@ def should_repack(git_dir_path: Path):
 
     pack_count = get_pack_count(git_dir_path)
     print(
-        '{}: {} loose objects, {} pack(s)'.format(
+        '{}{}{}: {} loose objects, {} pack(s)'.format(
+            REPOSITORY_COLOR,
             display_name,
+            NO_COLOR,
             object_count,
             pack_count,
         )
     )
-    return object_count or (pack_count - 1)
+    return bool(object_count or (pack_count - 1))
 
 def remove_logs(git_dir_path: Path):
     git_log_dir = git_dir_path / 'logs'
     if git_log_dir.is_dir():
-        rmtree(str(git_log_dir))
+        rmtree(git_log_dir)
 
 if __name__  == '__main__':
     p = ArgumentParser()
@@ -82,14 +88,14 @@ if __name__  == '__main__':
     args = p.parse_args()
     for git_directory in find_git_dirs(args.directory):
         if args.remote_prune:
-            Popen((x.format(git_directory) for x in remote_prune)).wait()
+            check_call((x.format(git_directory) for x in remote_prune))
         if args.remove_logs:
             remove_logs(git_directory)
         force_repack = False
         if args.remote_prune or args.remove_logs:
             force_repack = True
-            print('{0}: repack forced'.format(git_directory))
+            print('{}{}{}: repack forced'.format(REPOSITORY_COLOR, git_directory, NO_COLOR))
         if (force_repack or should_repack(git_directory)) and not args.pretend:
-            Popen((x.format(git_directory) for x in repack)).wait()
-            Popen((x.format(git_directory) for x in prune)).wait()
+            check_call((x.format(git_directory) for x in repack))
+            check_call((x.format(git_directory) for x in prune))
 
