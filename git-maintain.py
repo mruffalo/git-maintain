@@ -36,7 +36,7 @@ def find_git_dirs(path: Path) -> Iterable[Path]:
 def get_pack_count(path: Path) -> int:
     pack_dir = path / 'objects' / 'pack'
     if pack_dir.is_dir():
-        packs = list(pack_dir.glob('pack_pattern'))
+        packs = list(pack_dir.glob(pack_pattern))
         return len(packs)
     else:
         return 0
