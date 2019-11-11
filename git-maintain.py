@@ -72,7 +72,7 @@ def should_repack(git_dir_path: Path) -> bool:
             pack_count,
         )
     )
-    return bool(object_count or (pack_count - 1))
+    return bool(object_count or (pack_count > 1))
 
 def remove_logs(git_dir_path: Path):
     git_log_dir = git_dir_path / 'logs'
