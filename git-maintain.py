@@ -1,17 +1,13 @@
 #!/usr/bin/env python3
 from argparse import ArgumentParser
 from fnmatch import fnmatch
-from os import listdir
+from os import walk
 from os.path import abspath, split as osps, join as ospj, isdir
 from pathlib import Path
 from shutil import rmtree
 from subprocess import Popen, PIPE, check_call
 from typing import Iterable
 
-try:
-    from scandir import walk
-except ImportError:
-    from os import walk
 
 REPOSITORY_COLOR = '\033[01;34m'
 NO_COLOR = '\033[00m'
