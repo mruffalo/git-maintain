@@ -1,8 +1,6 @@
 #!/usr/bin/env python3
 from argparse import ArgumentParser
-from fnmatch import fnmatch
 from os import walk
-from os.path import abspath, split as osps, join as ospj, isdir
 from pathlib import Path
 from shutil import rmtree
 from subprocess import Popen, PIPE, check_call
@@ -18,7 +16,7 @@ repack = git_command + ('repack', '-Ad')
 prune = git_command + ('prune', '-v')
 pack_refs = git_command + ('pack-refs', '--all')
 # TODO don't hardcode 'origin'
-remote_prune = git_command + ('remote', 'prune', 'origin')
+remote_prune_command = git_command + ('remote', 'prune', 'origin')
 pack_pattern = '*.pack'
 git_dir_pattern = '.git'
 
@@ -30,12 +28,15 @@ def find_git_dirs(path: Path) -> Iterable[Path]:
                 yield dirpath / dirname
 
 def get_pack_count(path: Path) -> int:
-    pack_dir = path / 'objects' / 'pack'
+    pack_dir = path / 'objects/pack'
     if pack_dir.is_dir():
         packs = list(pack_dir.glob(pack_pattern))
         return len(packs)
     else:
         return 0
+
+def colorize_repo_name(repo_name) -> str:
+    return f'{REPOSITORY_COLOR}{repo_name}{NO_COLOR}'
 
 def should_repack(git_dir_path: Path) -> bool:
     command = [
@@ -59,21 +60,26 @@ def should_repack(git_dir_path: Path) -> bool:
         display_name = git_dir_path
 
     pack_count = get_pack_count(git_dir_path)
-    print(
-        '{}{}{}: {} loose objects, {} pack(s)'.format(
-            REPOSITORY_COLOR,
-            display_name,
-            NO_COLOR,
-            object_count,
-            pack_count,
-        )
-    )
+    print(f'{colorize_repo_name(display_name)}: {object_count} loose objects, {pack_count} pack(s)')
     return bool(object_count or (pack_count > 1))
 
-def remove_logs(git_dir_path: Path):
+def delete_log_dir(git_dir_path: Path):
     git_log_dir = git_dir_path / 'logs'
     if git_log_dir.is_dir():
         rmtree(git_log_dir)
+
+def maintain_repository(git_directory: Path, remote_prune: bool, remove_logs: bool, pretend: bool):
+    if remote_prune:
+        check_call([x.format(git_directory) for x in remote_prune_command])
+    if remove_logs:
+        delete_log_dir(git_directory)
+    force_repack = False
+    if remote_prune or remove_logs:
+        force_repack = True
+        print(f'{colorize_repo_name(git_directory)}: repack forced')
+    if (force_repack or should_repack(git_directory)) and not pretend:
+        check_call([x.format(git_directory) for x in repack])
+        check_call([x.format(git_directory) for x in prune])
 
 if __name__  == '__main__':
     p = ArgumentParser()
@@ -82,16 +88,6 @@ if __name__  == '__main__':
     p.add_argument('--remove-logs', action='store_true')
     p.add_argument('-n', '--pretend', action='store_true')
     args = p.parse_args()
-    for git_directory in find_git_dirs(args.directory):
-        if args.remote_prune:
-            check_call((x.format(git_directory) for x in remote_prune))
-        if args.remove_logs:
-            remove_logs(git_directory)
-        force_repack = False
-        if args.remote_prune or args.remove_logs:
-            force_repack = True
-            print('{}{}{}: repack forced'.format(REPOSITORY_COLOR, git_directory, NO_COLOR))
-        if (force_repack or should_repack(git_directory)) and not args.pretend:
-            check_call((x.format(git_directory) for x in repack))
-            check_call((x.format(git_directory) for x in prune))
 
+    for git_directory in find_git_dirs(args.directory):
+        maintain_repository(git_directory, args.remote_prune, args.remove_logs, args.pretend)
