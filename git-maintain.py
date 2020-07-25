@@ -18,14 +18,26 @@ pack_refs = git_command + ('pack-refs', '--all')
 # TODO don't hardcode 'origin'
 remote_prune_command = git_command + ('remote', 'prune', 'origin')
 pack_pattern = '*.pack'
-git_dir_pattern = '.git'
+git_dir_or_file_pattern = '.git'
+
+def read_relative_git_dir(git_submodule_file: Path) -> Path:
+    with open(git_submodule_file) as f:
+        pieces = next(f).strip().split()
+        if pieces[0] =='gitdir:':
+            # Not sure whether anything else would ever be present,
+            # but be safe just in case
+            return Path(pieces[1])
 
 def find_git_dirs(path: Path) -> Iterable[Path]:
-    for dirpath_str, dirnames, _ in walk(path):
+    resolved = path.resolve()
+    for dirpath_str, dirnames, filenames in walk(path):
         dirpath = Path(dirpath_str)
         for dirname in dirnames:
-            if dirname.endswith(git_dir_pattern):
+            if dirname.endswith(git_dir_or_file_pattern):
                 yield dirpath / dirname
+        if git_dir_or_file_pattern in filenames:
+            relative_repo_path = read_relative_git_dir(dirpath / git_dir_or_file_pattern)
+            yield (dirpath / relative_repo_path).resolve().relative_to(resolved)
 
 def get_pack_count(path: Path) -> int:
     pack_dir = path / 'objects/pack'
@@ -83,7 +95,7 @@ def maintain_repository(git_directory: Path, remote_prune: bool, remove_logs: bo
 
 if __name__  == '__main__':
     p = ArgumentParser()
-    p.add_argument('directory', type=Path)
+    p.add_argument('directory', type=Path, nargs='?', default=Path())
     p.add_argument('--remote-prune', action='store_true')
     p.add_argument('--remove-logs', action='store_true')
     p.add_argument('-n', '--pretend', action='store_true')
