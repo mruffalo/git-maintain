@@ -27,13 +27,12 @@ class GitCommandRunner:
             self.display_name = git_dir
 
     def __call__(self, *args: Sequence[str], **subprocess_kwargs):
-        command = [GIT, *args]
-        command_str = ' '.join(command)
+        command = [GIT, f'--git-dir={self.git_dir}', *args]
         if not self.pretend:
             return run(command, check=True, **subprocess_kwargs)
 
     def print(self, *args, **kwargs):
-        args = [f'{colorize_repo_name(self.git_dir)}:'] + list(args)
+        args = [f'{colorize_repo_name(self.display_name)}:'] + list(args)
         print(*args, **kwargs)
 
     def get_pack_count(self) -> int:
