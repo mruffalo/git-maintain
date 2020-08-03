@@ -23,7 +23,7 @@ git_dir_or_file_pattern = '.git'
 def read_relative_git_dir(git_submodule_file: Path) -> Path:
     with open(git_submodule_file) as f:
         pieces = next(f).strip().split()
-        if pieces[0] =='gitdir:':
+        if pieces[0] == 'gitdir:':
             # Not sure whether anything else would ever be present,
             # but be safe just in case
             return Path(pieces[1])
@@ -53,12 +53,6 @@ def colorize_repo_name(repo_name) -> str:
 def should_repack(git_dir_path: Path) -> bool:
     command = [
         piece.format(git_dir_path)
-        for piece in pack_refs
-    ]
-    Popen(command).wait()
-
-    command = [
-        piece.format(git_dir_path)
         for piece in count_objects
     ]
     s = Popen(command, stdout=PIPE)
@@ -81,6 +75,12 @@ def delete_log_dir(git_dir_path: Path):
         rmtree(git_log_dir)
 
 def maintain_repository(git_directory: Path, remote_prune: bool, remove_logs: bool, pretend: bool):
+    command = [
+        piece.format(git_directory)
+        for piece in pack_refs
+    ]
+    Popen(command).wait()
+
     if remote_prune:
         check_call([x.format(git_directory) for x in remote_prune_command])
     if remove_logs:
